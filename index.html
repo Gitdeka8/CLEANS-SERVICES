@@ -1520,6 +1520,7 @@ function buildFactureHTML(nom, tel, prestation, prix, numLabel, dateStr) {
 }
 
 // Appelé depuis chaque bouton "📄 Facture PDF" dans l'historique
+// Appelé depuis chaque bouton "📄 Facture PDF" dans l'historique
 function imprimerDepuisHisto(id) {
   const data = getData();
   const item = data.find(x => x.id === id);
@@ -1528,24 +1529,25 @@ function imprimerDepuisHisto(id) {
   const { num, label } = getNextNumFacture();
   const dateStr = new Date().toLocaleDateString('fr-FR', {day:'2-digit', month:'2-digit', year:'numeric'});
 
-  // Construire le HTML en inline styles (résistant au thème sombre)
+  // Construire le HTML en inline styles
   const factureHTML = buildFactureHTML(
     item.nom, item.tel, item.type, item.total, label, dateStr
   );
 
-  // Injecter dans le wrapper hors-app
+  // Injecter dans le wrapper
   const wrapper = document.getElementById('facture-print-wrapper');
   wrapper.innerHTML = factureHTML;
 
-  // Nommer le fichier PDF automatiquement
+  // Nommer le fichier PDF
   const prevTitle  = document.title;
   document.title   = 'facture_' + num;
 
-  window.print();
+  // 🚀 L'IMPRESSION SE LANCE DIRECTEMENT ICI (Plus de chronomètre d'attente)
+  window.print(); 
 
-  // Restaurer après que le dialogue d'impression soit ouvert
+  // Nettoyage de la page APRÈS l'ouverture de la fenêtre d'impression
   setTimeout(() => {
-    document.title   = prevTitle;
+    document.title = prevTitle;
     wrapper.innerHTML = '';
   }, 2000);
 
@@ -1556,7 +1558,6 @@ function imprimerDepuisHisto(id) {
     localStorage.setItem('cps_factures', JSON.stringify(hist));
   } catch {}
 }
-
 </script>
 
 <!-- Conteneur impression PDF (hors app) -->
