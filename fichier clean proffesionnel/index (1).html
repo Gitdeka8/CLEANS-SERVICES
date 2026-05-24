@@ -1,0 +1,1566 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<!-- BUG 9 CORRIGÉ : user-scalable=no retiré pour autoriser le zoom -->
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="theme-color" content="#0d1f0f">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<title>PestControl Pro</title>
+<link rel="manifest" href="manifest.json">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0a1a0c;
+    --bg2: #0f2312;
+    --card: #122916;
+    --card2: #172f1b;
+    --border: #1e4025;
+    --accent: #39ff6a;
+    --accent2: #00c94a;
+    --accent-dim: rgba(57,255,106,0.12);
+    --accent-glow: 0 0 24px rgba(57,255,106,0.25);
+    --red: #ff4d4d;
+    --red-dim: rgba(255,77,77,0.12);
+    --orange: #ff9a3c;
+    --orange-dim: rgba(255,154,60,0.12);
+    --text: #e8f5ea;
+    --text2: #7aab80;
+    --text3: #4a7550;
+    --font: 'Syne', sans-serif;
+    --mono: 'DM Mono', monospace;
+    --radius: 16px;
+    --radius-sm: 10px;
+    --nav-h: 72px;
+    --safe-bottom: env(safe-area-inset-bottom, 0px);
+  }
+
+  * { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+
+  html, body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--font);
+    height: 100%;
+    overflow: hidden;
+  }
+
+  #app { display:flex; flex-direction:column; height:100vh; height:100dvh; }
+
+  .header {
+    background: var(--bg);
+    border-bottom: 1px solid var(--border);
+    padding: 16px 20px 12px;
+    display: flex; align-items: center; gap: 12px;
+    flex-shrink: 0; z-index: 10;
+  }
+  .header-logo {
+    width: 36px; height: 36px;
+    background: var(--accent-dim); border: 1px solid var(--accent);
+    border-radius: 10px; display: flex; align-items:center; justify-content:center;
+    font-size: 18px;
+  }
+  .header-title { font-size: 18px; font-weight: 800; letter-spacing: -0.5px; }
+  .header-title span { color: var(--accent); }
+  .header-badge {
+    margin-left: auto; font-family: var(--mono); font-size: 11px;
+    color: var(--text3); background: var(--card); border: 1px solid var(--border);
+    padding: 4px 8px; border-radius: 20px; display: flex; align-items:center; gap:5px;
+  }
+  .header-badge::before {
+    content:''; width:6px; height:6px; border-radius:50%;
+    background: var(--accent); box-shadow: 0 0 6px var(--accent);
+    animation: pulse 2s infinite;
+  }
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
+
+  .page-wrap {
+    flex: 1; overflow-y: auto; overflow-x: hidden;
+    -webkit-overflow-scrolling: touch; scroll-behavior: smooth;
+  }
+  .page { display:none; padding: 20px 16px; padding-bottom: calc(var(--nav-h) + 16px + var(--safe-bottom)); }
+  .page.active { display:block; animation: fadeUp 0.25s ease; }
+  @keyframes fadeUp { from{opacity:0;transform:translateY(10px)} to{opacity:1;transform:translateY(0)} }
+
+  /* NAV */
+  .nav-bar {
+    height: var(--nav-h); padding-bottom: var(--safe-bottom);
+    background: var(--bg2); border-top: 1px solid var(--border);
+    display: grid; grid-template-columns: repeat(4, 1fr);
+    flex-shrink: 0; z-index: 100;
+  }
+  .nav-btn {
+    display: flex; flex-direction:column; align-items:center; justify-content:center;
+    gap: 4px; cursor: pointer; border: none; background: transparent;
+    color: var(--text3); transition: color 0.2s; font-family: var(--font); position: relative;
+  }
+  .nav-btn.active { color: var(--accent); }
+  .nav-btn.active::before {
+    content:''; position:absolute; top:0; left:50%; transform:translateX(-50%);
+    width: 32px; height: 2px; background: var(--accent);
+    border-radius: 0 0 4px 4px; box-shadow: 0 0 8px var(--accent);
+  }
+  .nav-icon { font-size: 22px; line-height:1; }
+  .nav-label { font-size: 10px; font-weight: 700; letter-spacing: 0.5px; text-transform:uppercase; }
+  /* BUG 13 CORRIGÉ : badge affiche montant total abrégé */
+  .nav-badge {
+    position: absolute; top: 6px; right: calc(50% - 24px);
+    background: var(--red); color: #fff;
+    font-size: 8px; font-weight: 700; font-family: var(--mono);
+    padding: 2px 5px; border-radius: 8px;
+    display: flex; align-items:center; justify-content:center;
+    white-space: nowrap;
+  }
+
+  /* CARDS & FORMS */
+  .section-title {
+    font-size: 13px; font-weight: 700; letter-spacing: 1.5px;
+    text-transform: uppercase; color: var(--text3);
+    margin-bottom: 12px; margin-top: 4px;
+    display: flex; align-items:center; gap: 8px;
+  }
+  .section-title::after { content:''; flex:1; height:1px; background: var(--border); }
+
+  .card {
+    background: var(--card); border: 1px solid var(--border);
+    border-radius: var(--radius); padding: 16px; margin-bottom: 12px;
+  }
+  .card-header {
+    font-size: 11px; font-weight: 700; letter-spacing: 1px;
+    text-transform: uppercase; color: var(--accent);
+    margin-bottom: 14px; display:flex; align-items:center; gap:6px;
+  }
+
+  .field { margin-bottom: 12px; }
+  .field label {
+    display: block; font-size: 12px; font-weight: 600;
+    color: var(--text2); margin-bottom: 6px;
+    text-transform: uppercase; letter-spacing: 0.5px;
+  }
+  .field label .req { color: var(--accent); }
+  .field input, .field select {
+    width: 100%; background: var(--bg); border: 1px solid var(--border);
+    border-radius: var(--radius-sm); color: var(--text);
+    font-family: var(--font); font-size: 15px; padding: 12px 14px;
+    outline: none; appearance: none; transition: border-color 0.2s, box-shadow 0.2s;
+  }
+  .field input:focus, .field select:focus {
+    border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-dim);
+  }
+  .field input::placeholder { color: var(--text3); }
+  .field-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+
+  .auto-field {
+    background: var(--card2); border: 1px solid var(--border);
+    border-radius: var(--radius-sm); padding: 12px 14px;
+    display: flex; justify-content:space-between; align-items:center;
+  }
+  .auto-field .af-label { font-size: 12px; color: var(--text3); }
+  .auto-field .af-value { font-family: var(--mono); font-size: 16px; font-weight: 500; color: var(--orange); }
+  .auto-field .af-value.zero { color: var(--accent); }
+
+  .btn {
+    width: 100%; padding: 16px; border: none; border-radius: var(--radius);
+    font-family: var(--font); font-size: 15px; font-weight: 800;
+    letter-spacing: 0.5px; cursor: pointer; transition: all 0.2s; text-transform: uppercase;
+  }
+  .btn-primary { background: var(--accent); color: #0a1a0c; box-shadow: var(--accent-glow); }
+  .btn-primary:active { transform: scale(0.97); opacity:0.9; }
+  .btn-primary:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+  .btn-sm { width: auto; padding: 8px 16px; font-size: 13px; border-radius: var(--radius-sm); }
+  .btn-outline { background: transparent; color: var(--accent); border: 1px solid var(--accent); }
+  .btn-outline:disabled { opacity: 0.4; cursor: not-allowed; }
+  .btn-danger { background: transparent; color: var(--red); border: 1px solid var(--red); }
+
+  /* TOAST */
+  #toast {
+    position: fixed; bottom: calc(var(--nav-h) + 16px + var(--safe-bottom));
+    left: 50%; transform: translateX(-50%) translateY(20px);
+    background: var(--card2); border: 1px solid var(--accent);
+    color: var(--text); font-size: 14px; font-weight: 600;
+    padding: 12px 20px; border-radius: 30px;
+    box-shadow: var(--accent-glow); opacity: 0; transition: all 0.3s; z-index: 999;
+    white-space: nowrap;
+  }
+  #toast.show { opacity:1; transform: translateX(-50%) translateY(0); }
+  #toast.error { border-color: var(--red); box-shadow: 0 0 24px rgba(255,77,77,0.3); }
+
+  /* DASHBOARD — BUG 6 CORRIGÉ : navigation mois */
+  .month-nav {
+    display: flex; align-items:center; justify-content:center; gap: 12px;
+    margin-bottom: 16px;
+  }
+  .month-nav-btn {
+    background: var(--card); border: 1px solid var(--border); color: var(--text2);
+    border-radius: var(--radius-sm); padding: 6px 16px; font-size: 20px;
+    cursor: pointer; font-family: var(--font); transition: all 0.15s; line-height:1;
+  }
+  .month-nav-btn:active { background: var(--accent-dim); border-color: var(--accent); }
+  .month-label {
+    font-family: var(--mono); font-size: 13px; color: var(--text2);
+    text-transform: uppercase; letter-spacing: 1px; text-align:center; flex: 1;
+  }
+
+  .kpi-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 12px; }
+  .kpi { background: var(--card); border: 1px solid var(--border); border-radius: var(--radius); padding: 14px; }
+  .kpi-label { font-size: 11px; color: var(--text3); font-weight: 700; letter-spacing: 0.5px; text-transform:uppercase; margin-bottom: 6px; }
+  .kpi-value { font-family: var(--mono); font-size: 20px; font-weight: 500; color: var(--text); line-height:1; }
+  .kpi-value.accent { color: var(--accent); }
+  .kpi-value.accent2 { color: var(--accent2); }
+  .kpi-value.orange { color: var(--orange); }
+  .kpi-value.red { color: var(--red); }
+  .kpi-full { grid-column: 1/-1; }
+  .kpi-sub { font-size: 11px; color: var(--text3); margin-top: 4px; font-family: var(--mono); }
+
+  /* HISTORIQUE — BUG 12 CORRIGÉ : cartes cliquables */
+  .inter-card {
+    background: var(--card); border: 1px solid var(--border);
+    border-radius: var(--radius); padding: 14px; margin-bottom: 10px;
+    display: flex; flex-direction:column; gap: 8px;
+    cursor: pointer; transition: border-color 0.2s, background 0.2s;
+  }
+  .inter-card:active { border-color: var(--accent); background: var(--card2); }
+  .inter-top { display:flex; justify-content:space-between; align-items:flex-start; }
+  .inter-name { font-size: 16px; font-weight: 700; }
+  .inter-type {
+    font-size: 11px; font-weight: 700; padding: 3px 8px;
+    border-radius: 20px; font-family: var(--mono); letter-spacing: 0.3px;
+  }
+  .type-derat { background: rgba(57,255,106,0.12); color: var(--accent); }
+  .type-desinf { background: rgba(255,154,60,0.12); color: var(--orange); }
+  .inter-bottom { display:flex; justify-content:space-between; align-items:center; }
+  .inter-meta { font-size: 12px; color: var(--text3); }
+  .inter-reste { font-family: var(--mono); font-size: 14px; font-weight: 500; padding: 4px 10px; border-radius: 8px; }
+  .reste-ok { background: var(--accent-dim); color: var(--accent); }
+  .reste-due { background: var(--red-dim); color: var(--red); }
+
+  .empty-state { text-align:center; padding: 48px 24px; color: var(--text3); }
+  .empty-icon { font-size: 48px; margin-bottom: 12px; opacity: 0.5; }
+  .empty-text { font-size: 14px; line-height: 1.6; }
+
+  /* DETTES */
+  .dette-card {
+    background: var(--card); border: 1px solid var(--border);
+    border-radius: var(--radius); padding: 14px; margin-bottom: 10px;
+  }
+  .dette-top { display:flex; justify-content:space-between; margin-bottom: 8px; }
+  .dette-name { font-size: 16px; font-weight: 700; }
+  .dette-amount { font-family: var(--mono); font-size: 18px; color: var(--red); font-weight: 500; }
+  .dette-meta { font-size: 12px; color: var(--text3); margin-bottom: 8px; }
+  /* BUG 18 CORRIGÉ : historique des paiements */
+  .dette-payments { margin-bottom: 10px; border-top: 1px solid var(--border); padding-top: 8px; }
+  .dette-payment-item {
+    font-size: 11px; color: var(--text3); font-family: var(--mono);
+    padding: 3px 0; display:flex; justify-content:space-between;
+  }
+  .dette-input-row { display: flex; gap: 8px; align-items: center; }
+  .dette-input-row input {
+    flex:1; background: var(--bg); border: 1px solid var(--border);
+    border-radius: var(--radius-sm); color: var(--text);
+    font-family: var(--font); font-size: 15px; padding: 10px 12px; outline: none;
+  }
+  .dette-input-row input:focus { border-color: var(--accent); }
+
+  .total-dettes {
+    background: var(--red-dim); border: 1px solid rgba(255,77,77,0.3);
+    border-radius: var(--radius); padding: 14px;
+    display: flex; justify-content:space-between; align-items:center;
+    margin-bottom: 16px;
+  }
+  .td-label { font-size: 13px; color: var(--text2); font-weight: 700; }
+  .td-value { font-family: var(--mono); font-size: 22px; color: var(--red); font-weight: 500; }
+
+  /* MODAL — BUG 1 & 12 CORRIGÉS */
+  .modal-overlay {
+    display: none; position: fixed; inset: 0; z-index: 500;
+    background: rgba(0,0,0,0.7); backdrop-filter: blur(4px);
+    align-items: flex-end; justify-content: center;
+  }
+  .modal-overlay.open { display: flex; }
+  .modal {
+    background: var(--bg2); border: 1px solid var(--border);
+    border-radius: var(--radius) var(--radius) 0 0;
+    padding: 20px 20px 32px; width: 100%; max-height: 85vh;
+    overflow-y: auto; animation: slideUp 0.25s ease;
+  }
+  @keyframes slideUp { from{transform:translateY(40px);opacity:0} to{transform:translateY(0);opacity:1} }
+  .modal-handle {
+    width: 40px; height: 4px; background: var(--border);
+    border-radius: 2px; margin: 0 auto 20px;
+  }
+  .modal-title { font-size: 18px; font-weight: 800; margin-bottom: 16px; }
+  .modal-row {
+    display: flex; justify-content:space-between; align-items:center;
+    padding: 10px 0; border-bottom: 1px solid var(--border); font-size: 14px;
+  }
+  .modal-row-label { color: var(--text3); }
+  .modal-row-value { font-family: var(--mono); font-weight: 500; text-align:right; }
+  .modal-section { font-size: 11px; font-weight:700; color: var(--accent); letter-spacing:1px; text-transform:uppercase; margin: 14px 0 6px; }
+  .modal-actions { display: flex; gap: 10px; margin-top: 20px; }
+  .modal-actions .btn { flex: 1; padding: 12px; font-size: 13px; }
+
+  /* Date input dark mode */
+  input[type="date"] { color-scheme: dark; }
+
+  /* SCROLLBAR */
+  .page-wrap::-webkit-scrollbar { width: 2px; }
+  .page-wrap::-webkit-scrollbar-track { background: transparent; }
+  .page-wrap::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
+
+  /* =====================================================
+     FACTURE — styles (onglet FACTURE)
+  ===================================================== */
+
+  /* Boutons onglet facture */
+  .btn-generer-facture {
+    width:100%; padding:16px; border:none; border-radius:var(--radius);
+    font-family:var(--font); font-size:15px; font-weight:800;
+    letter-spacing:0.5px; cursor:pointer; text-transform:uppercase;
+    background:var(--accent); color:#0a1a0c; box-shadow:var(--accent-glow);
+    transition:all 0.2s;
+  }
+  .btn-generer-facture:active { transform:scale(0.97); opacity:0.9; }
+
+  .btn-pdf-facture {
+    width:100%; padding:14px; border:none; border-radius:var(--radius);
+    font-family:var(--font); font-size:14px; font-weight:800;
+    cursor:pointer; text-transform:uppercase; letter-spacing:0.5px;
+    background:#22c55e; color:#fff; margin-bottom:12px;
+  }
+
+  .btn-reset-facture {
+    width:100%; padding:10px; border:1px solid var(--border);
+    border-radius:var(--radius); background:transparent;
+    color:var(--text2); font-family:var(--font); font-size:13px;
+    cursor:pointer; margin-top:8px;
+  }
+
+  #apercu-facture { display:none; margin-top:20px; }
+
+  /* ── FACTURE DOCUMENT (style Excel/administratif) ── */
+  #facture-print {
+    background:#fff; color:#000;
+    font-family:Arial, Helvetica, sans-serif;
+    font-size:12px; border:1px solid #bbb;
+    width:100%; border-radius:6px;
+    box-shadow:0 2px 16px rgba(0,0,0,0.35);
+    overflow:hidden;
+  }
+
+  .f-header {
+    display:flex; justify-content:space-between; align-items:flex-start;
+    padding:14px 16px 12px; background:#fff;
+    border-bottom:1px solid #e0e0e0;
+  }
+
+  .f-company-left { display:flex; align-items:flex-start; gap:12px; }
+
+  /* Logo : placez logo.jpg dans le même dossier que index.html */
+  .f-logo {
+    width:80px; height:auto; object-fit:contain;
+    flex-shrink:0; display:block;
+  }
+
+  .f-company-text {
+    display:flex; flex-direction:column; gap:3px;
+    padding-top:2px; font-size:10.5px; color:#333; line-height:1.55;
+  }
+  .f-company-text .f-cn { font-weight:700; font-size:12px; color:#1a6bb5; text-transform:uppercase; }
+  .f-company-text .f-email { color:#1a6bb5; }
+
+  .f-invoice-meta {
+    text-align:right; font-size:11px; color:#222; line-height:1.9; white-space:nowrap;
+  }
+  .f-invoice-meta .f-inv-label { font-weight:700; color:#1a6bb5; display:block; }
+
+  .f-blue-divider { height:8px; background:#5d8fd6; width:100%; }
+
+  .f-client-title {
+    background:#5d8fd6; color:#fff; text-align:center;
+    padding:6px 0; font-weight:700; font-size:11px;
+    letter-spacing:1.5px; text-transform:uppercase;
+  }
+
+  .f-client-info {
+    background:#f2f6fc; text-align:center;
+    padding:7px 14px 9px; font-size:11px; color:#333; line-height:1.7;
+  }
+
+  .f-table {
+    width:100%; border-collapse:collapse;
+    font-size:11.5px; table-layout:fixed;
+  }
+  .f-table col.col-desc { width:44%; }
+  .f-table col.col-qty  { width:10%; }
+  .f-table col.col-pu   { width:23%; }
+  .f-table col.col-tot  { width:23%; }
+
+  .f-table thead tr { background:#5d8fd6; color:#fff; }
+  .f-table thead th {
+    padding:8px 6px; font-weight:700; text-align:center;
+    text-transform:uppercase; font-size:11px; border:1px solid #4a7abf;
+  }
+  .f-table thead th.th-desc { text-align:left; padding-left:10px; }
+
+  .f-table tbody td {
+    border:1px solid #d0d0d0; padding:6px; color:#222;
+    text-align:center; vertical-align:middle; height:24px;
+  }
+  .f-table tbody td.td-desc { text-align:left; padding-left:10px; font-weight:500; }
+  .f-table tbody td.td-amount { text-align:right; padding-right:8px; }
+  .f-table tbody tr.f-empty td { color:transparent; }
+
+  .f-total-row { background:#ffff00; }
+  .f-total-row td {
+    border:1px solid #c8b800; padding:9px 6px;
+    font-weight:700; font-size:12px; color:#111;
+  }
+  .f-total-label {
+    text-align:right !important; padding-right:14px !important;
+    text-transform:uppercase; letter-spacing:0.5px;
+  }
+  .f-total-amount {
+    text-align:right !important; padding-right:8px !important;
+    font-size:13px !important; font-weight:800 !important;
+  }
+
+  .f-footer {
+    text-align:center; font-size:10.5px; color:#555;
+    padding:10px; background:#fff; font-style:italic;
+    border-top:1px solid #eee;
+  }
+
+  /* ── @media print : PDF blanc, fidèle au modèle ── */
+  @media print {
+
+    /* 1. Forcer la reproduction exacte des couleurs de fond */
+    * {
+      -webkit-print-color-adjust: exact !important;
+              print-color-adjust: exact !important;
+              color-adjust: exact !important;
+    }
+
+    /* 2. Format A4 */
+    @page { size: A4 portrait; margin: 0; }
+    #facture-print-wrapper { padding: 14mm; }
+
+    /* 3. Neutraliser le thème sombre : html ET body forcés en blanc/noir */
+    html, body {
+      background-color: #ffffff !important;
+      background: #ffffff !important;
+      color: #000000 !important;
+      height: auto !important;
+      overflow: visible !important;
+    }
+
+    /* 4. Masquer toute l'application (app, overlays, modals, toasts…) */
+    body > * { display: none !important; }
+    #app,
+    .modal-overlay,
+    #toast { display: none !important; }
+
+    /* 5. Afficher uniquement le wrapper d'impression */
+    #facture-print-wrapper {
+      display: block !important;
+      position: static !important;
+      background-color: #ffffff !important;
+      width: 100% !important;
+      padding: 0 !important;
+      margin: 0 !important;
+    }
+
+    /* 6. Le document facture lui-même */
+    #facture-print-wrapper #facture-print {
+      display: block !important;
+      background-color: #ffffff !important;
+      color: #000000 !important;
+      box-shadow: none !important;
+      border-radius: 0 !important;
+      width: 100% !important;
+      border: 1px solid #bbb !important;
+      overflow: visible !important;
+    }
+
+    /* 7. Réaffirmer toutes les couleurs critiques (bleu et jaune) */
+    .f-header       { background-color: #ffffff !important; }
+    .f-blue-divider { background-color: #5d8fd6 !important; }
+    .f-client-title { background-color: #5d8fd6 !important; color: #ffffff !important; }
+    .f-client-info  { background-color: #f2f6fc !important; color: #333333 !important; }
+    .f-table thead tr { background-color: #5d8fd6 !important; color: #ffffff !important; }
+    .f-table thead th { border-color: #4a7abf !important; color: #ffffff !important; }
+    .f-table tbody td { background-color: #ffffff !important; color: #222222 !important; border-color: #d0d0d0 !important; }
+    .f-total-row    { background-color: #ffff00 !important; }
+    .f-total-row td { background-color: #ffff00 !important; color: #111111 !important; border-color: #c8b800 !important; }
+    .f-footer       { background-color: #ffffff !important; color: #555555 !important; }
+
+    /* 8. Logo taille fixe */
+    .f-logo { width: 80px !important; height: auto !important; }
+  }
+
+</style>
+</head>
+<body>
+<div id="app">
+
+  <!-- HEADER -->
+  <div class="header">
+    <div class="header-logo">🐀</div>
+    <div class="header-title">Pest<span>Control</span> Pro</div>
+    <div class="header-badge" id="syncBadge">LOCAL</div>
+  </div>
+
+  <div class="page-wrap">
+
+    <!-- ══════ PAGE SAISIE ══════ -->
+    <div class="page active" id="page-saisie">
+      <div class="section-title">Nouvelle Intervention</div>
+
+      <div class="card">
+        <div class="card-header">👤 Infos Client</div>
+        <div class="field">
+          <label>Nom <span class="req">*</span></label>
+          <input type="text" id="s-nom" placeholder="Ex : Moussa Traoré" autocomplete="off">
+        </div>
+        <div class="field">
+          <label>Téléphone <span class="req">*</span></label>
+          <input type="tel" id="s-tel" placeholder="Ex : +226 70 00 00 00" autocomplete="off">
+        </div>
+        <div class="field">
+          <label>Quartier / Ville <span class="req">*</span></label>
+          <input type="text" id="s-quartier" placeholder="Ex : Secteur 22, Bobo" autocomplete="off">
+        </div>
+        <!-- BUG 2 CORRIGÉ : champ date manuel -->
+        <div class="field">
+          <label>Date de l'intervention</label>
+          <input type="date" id="s-date">
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-header">🧪 Prestation & Dépenses</div>
+        <div class="field">
+          <label>Type de service</label>
+          <select id="s-type">
+            <option value="Dératisation">🐀 Dératisation</option>
+            <option value="Désinfection">🦟 Désinfection</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>Prix du produit utilisé <span class="req">*</span> (FCFA)</label>
+          <!-- BUG 14 CORRIGÉ : pas de value="0", placeholder seulement -->
+          <input type="number" id="s-produit" placeholder="Ex : 5 000" min="0" inputmode="numeric">
+        </div>
+        <div class="field-row">
+          <div class="field">
+            <label>Transport (FCFA)</label>
+            <input type="number" id="s-transport" placeholder="0" min="0" inputmode="numeric">
+          </div>
+          <div class="field">
+            <label>Nourriture (FCFA)</label>
+            <input type="number" id="s-nourriture" placeholder="0" min="0" inputmode="numeric">
+          </div>
+        </div>
+        <div class="field">
+          <label>Frais Divers (FCFA)</label>
+          <input type="number" id="s-divers" placeholder="0" min="0" inputmode="numeric">
+        </div>
+        <!-- TÂCHE 2 : boîtes par chantier -->
+        <div class="field">
+          <label>Boîtes installées</label>
+          <input type="number" id="s-boites" placeholder="0" min="0" inputmode="numeric">
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-header">💰 Paiement & Source</div>
+        <div class="field">
+          <label>Total facturé au client <span class="req">*</span> (FCFA)</label>
+          <input type="number" id="s-total" placeholder="Ex : 25 000" min="0" inputmode="numeric">
+        </div>
+        <div class="field">
+          <label>Avance versée aujourd'hui <span class="req">*</span> (FCFA)</label>
+          <!-- BUG 14 CORRIGÉ : pas de value="0" -->
+          <input type="number" id="s-avance" placeholder="0" min="0" inputmode="numeric">
+        </div>
+        <div class="field">
+          <label>Reste à payer (calculé automatiquement)</label>
+          <div class="auto-field">
+            <span class="af-label">Reste à payer</span>
+            <span class="af-value zero" id="s-reste">0 FCFA</span>
+          </div>
+        </div>
+        <div class="field">
+          <label>Source du client</label>
+          <select id="s-source">
+            <option value="Bouche à oreille">🗣️ Bouche à oreille</option>
+            <option value="Publicité Facebook">📘 Publicité Facebook</option>
+            <option value="Autre">💡 Autre</option>
+          </select>
+        </div>
+      </div>
+
+      <button class="btn btn-primary" id="btn-save" onclick="saveIntervention()">✅ Enregistrer l'Intervention</button>
+    </div>
+
+    <!-- ══════ PAGE DASHBOARD ══════ -->
+    <div class="page" id="page-dash">
+      <div class="section-title">Analyse du Mois</div>
+
+      <!-- TÂCHE 3 : filtre de période intelligent -->
+      <div class="field" style="margin-bottom:16px;">
+        <select id="dash-period" onchange="updateDash()" style="font-weight:700;color:var(--accent);font-size:15px;">
+          <option value="day">📅 Aujourd'hui</option>
+          <option value="week">📅 Cette Semaine</option>
+          <option value="month" selected>📅 Ce Mois</option>
+          <option value="year">📅 Cette Année</option>
+        </select>
+      </div>
+      <div class="month-label" id="dash-month-label" style="margin-bottom:12px;"></div>
+
+      <!-- Charges fixes liées au mois affiché -->
+      <div class="card">
+        <div class="card-header">⚙️ Charges fixes du mois affiché</div>
+        <div class="field">
+          <label>Loyer (FCFA)</label>
+          <input type="number" id="d-loyer" placeholder="0" min="0" inputmode="numeric" oninput="saveMonthlyVars(); updateDash()">
+        </div>
+      </div>
+
+      <!-- TÂCHE 3 : Dépenses pub avec date, multi-entrées -->
+      <div class="card">
+        <div class="card-header">📘 Dépenses Publicitaires (Facebook)</div>
+        <div class="field-row">
+          <div class="field">
+            <label>Date</label>
+            <input type="date" id="d-pub-date" style="font-size:13px;">
+          </div>
+          <div class="field">
+            <label>Montant (FCFA)</label>
+            <input type="number" id="d-pub-montant" placeholder="Ex : 5 000" min="0" inputmode="numeric">
+          </div>
+        </div>
+        <button class="btn btn-outline btn-sm" style="margin-top:4px;" onclick="ajouterPub()">➕ Ajouter cette pub</button>
+        <div id="liste-pub-mois" style="margin-top:10px;"></div>
+      </div>
+
+      <div class="kpi-grid">
+        <div class="kpi kpi-full">
+          <div class="kpi-label">💵 Chiffre d'Affaires Mensuel</div>
+          <div class="kpi-value accent" id="d-ca">0 FCFA</div>
+          <div class="kpi-sub" id="d-nb-inter">0 intervention(s)</div>
+        </div>
+        <!-- BUG 4 CORRIGÉ : trésorerie réelle distincte du CA -->
+        <div class="kpi kpi-full">
+          <div class="kpi-label">💳 Trésorerie encaissée</div>
+          <div class="kpi-value accent2" id="d-tresorerie">0 FCFA</div>
+          <div class="kpi-sub" id="d-reste-total">0 FCFA encore à encaisser</div>
+        </div>
+        <div class="kpi">
+          <div class="kpi-label">📉 Dépenses Terrain</div>
+          <div class="kpi-value red" id="d-depenses">0 FCFA</div>
+        </div>
+        <div class="kpi">
+          <div class="kpi-label">🏠 Loyer</div>
+          <div class="kpi-value" id="d-loyer-kpi">0 FCFA</div>
+        </div>
+        <div class="kpi kpi-full">
+          <div class="kpi-label">🏆 Bénéfice NET réel</div>
+          <div class="kpi-value" id="d-benefice">0 FCFA</div>
+        </div>
+        <div class="kpi">
+          <div class="kpi-label">🎯 CAC Facebook</div>
+          <div class="kpi-value orange" id="d-cac">—</div>
+          <div class="kpi-sub" id="d-clients-pub">0 client(s) pub</div>
+        </div>
+        <div class="kpi kpi-full">
+          <div class="kpi-label">📣 Budget Pub du mois</div>
+          <div class="kpi-value orange" id="d-pub-total">0 FCFA</div>
+          <div class="kpi-sub" id="d-pub-nb">0 campagne(s)</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══════ PAGE HISTORIQUE ══════ -->
+    <div class="page" id="page-histo">
+      <div class="section-title">Historique Complet</div>
+      <!-- TÂCHE 4 : barre de recherche -->
+      <div class="field" style="margin-bottom:16px;">
+        <input type="text" id="search-histo" placeholder="🔍 Rechercher un nom ou quartier..." oninput="renderHisto()" autocomplete="off">
+      </div>
+      <div id="histo-list"></div>
+    </div>
+
+
+        <!-- ══════ PAGE DETTES ══════ -->
+    <div class="page" id="page-dettes">
+      <div class="section-title">Arriérés Clients</div>
+      <div id="total-dettes-wrap"></div>
+      <div id="dettes-list"></div>
+    </div>
+
+  </div>
+
+  <!-- NAV BAR -->
+  <nav class="nav-bar">
+    <button class="nav-btn" onclick="showPage('dash')" id="nav-dash">
+      <span class="nav-icon">📊</span>
+      <span class="nav-label">Dash</span>
+    </button>
+    <button class="nav-btn active" onclick="showPage('saisie')" id="nav-saisie">
+      <span class="nav-icon">➕</span>
+      <span class="nav-label">Saisie</span>
+    </button>
+    <button class="nav-btn" onclick="showPage('histo')" id="nav-histo">
+      <span class="nav-icon">📋</span>
+      <span class="nav-label">Historique</span>
+    </button>
+    <button class="nav-btn" onclick="showPage('dettes')" id="nav-dettes">
+      <span class="nav-icon">⚠️</span>
+      <span class="nav-label">Dettes</span>
+      <span class="nav-badge" id="badge-dettes" style="display:none"></span>
+    </button>
+  </nav>
+</div>
+
+<!-- MODAL détail / suppression (Bug 1 & 12) -->
+<div class="modal-overlay" id="modal-overlay" onclick="closeModalOnOverlay(event)">
+  <div class="modal">
+    <div class="modal-handle"></div>
+    <div id="modal-body"></div>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<script>
+// ═══════════════════════════════════════════════════
+//  STORAGE — BUG 5 CORRIGÉ : try/catch saveData
+// ═══════════════════════════════════════════════════
+function getData() {
+  try { return JSON.parse(localStorage.getItem('pcp_interventions') || '[]'); }
+  catch { return []; }
+}
+function saveData(arr) {
+  try {
+    localStorage.setItem('pcp_interventions', JSON.stringify(arr));
+  } catch(e) {
+    showToast('⚠️ Stockage plein ou bloqué !', true);
+  }
+}
+function generateId() {
+  return Date.now().toString(36) + Math.random().toString(36).slice(2,6);
+}
+
+// ═══════════════════════════════════════════════════
+//  DASH VARS — TÂCHE 3 : clé dynamique par mois/année
+// ═══════════════════════════════════════════════════
+function getMonthKey(month, year) {
+  return 'pcp_mensuel_' + month + '_' + year;
+}
+function saveMonthlyVars() {
+  const now    = new Date();
+  const key    = getMonthKey(now.getMonth(), now.getFullYear());
+  try {
+    localStorage.setItem(key, JSON.stringify({
+      loyer: document.getElementById('d-loyer').value
+    }));
+  } catch {}
+}
+function loadMonthlyVars(month, year) {
+  try {
+    const v = JSON.parse(localStorage.getItem(getMonthKey(month, year)) || '{}');
+    document.getElementById('d-loyer').value = v.loyer !== undefined ? v.loyer : '';
+  } catch {}
+}
+
+// ═══════════════════════════════════════════════════
+//  PUBS — TÂCHE 3 : tableau de pubs avec dates
+// ═══════════════════════════════════════════════════
+function getPubs() {
+  try { return JSON.parse(localStorage.getItem('pcp_pubs') || '[]'); } catch { return []; }
+}
+function savePubs(arr) {
+  try { localStorage.setItem('pcp_pubs', JSON.stringify(arr)); } catch {}
+}
+
+function ajouterPub() {
+  const dateVal = document.getElementById('d-pub-date').value;
+  const montant = parseFloat((document.getElementById('d-pub-montant').value || '').replace(',', '.'));
+  if (!dateVal)              return showToast('⚠️ Choisissez une date pour la pub', true);
+  if (isNaN(montant) || montant <= 0) return showToast('⚠️ Montant de pub invalide', true);
+
+  const pubs = getPubs();
+  pubs.push({ id: generateId(), date: dateVal, montant });
+  savePubs(pubs);
+
+  document.getElementById('d-pub-date').value   = '';
+  document.getElementById('d-pub-montant').value = '';
+  updateDash();
+  showToast('📘 Pub ajoutée : ' + montant.toLocaleString('fr-FR') + ' FCFA');
+}
+
+function supprimerPub(pubId) {
+  let pubs = getPubs().filter(p => p.id !== pubId);
+  savePubs(pubs);
+  updateDash();
+  showToast('🗑️ Pub supprimée');
+}
+
+function renderListePubs(pubsDuMois) {
+  const el = document.getElementById('liste-pub-mois');
+  if (!el) return;
+  if (pubsDuMois.length === 0) {
+    el.innerHTML = '<div style="font-size:12px;color:var(--text3);padding:4px 0;">Aucune pub enregistrée pour ce mois.</div>';
+    return;
+  }
+  el.innerHTML = pubsDuMois.map(p => {
+    const d = new Date(p.date + 'T12:00:00').toLocaleDateString('fr-FR', {day:'2-digit', month:'short'});
+    return `<div style="display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid var(--border);font-size:12px;">
+      <span style="color:var(--text3);">📘 ${d}</span>
+      <span style="font-family:var(--mono);color:var(--orange);">${p.montant.toLocaleString('fr-FR')} FCFA</span>
+      <button onclick="supprimerPub('${p.id}')" style="background:none;border:none;color:var(--red);cursor:pointer;font-size:14px;padding:0 4px;">✕</button>
+    </div>`;
+  }).join('');
+}
+
+// ═══════════════════════════════════════════════════
+//  NAVIGATION
+// ═══════════════════════════════════════════════════
+function showPage(name) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById('page-' + name).classList.add('active');
+  document.getElementById('nav-' + name).classList.add('active');
+  if (name === 'dash')   updateDash();
+  if (name === 'histo')  renderHisto();
+  if (name === 'dettes') renderDettes();
+}
+
+// ═══════════════════════════════════════════════════
+//  SAISIE
+// ═══════════════════════════════════════════════════
+// Initialiser la date à aujourd'hui
+document.getElementById('s-date').value = new Date().toISOString().slice(0,10);
+
+['s-total','s-avance'].forEach(id => {
+  document.getElementById(id)?.addEventListener('input', updateReste);
+});
+
+function updateReste() {
+  const total  = parseFloat(document.getElementById('s-total').value)  || 0;
+  const avance = parseFloat(document.getElementById('s-avance').value) || 0;
+  const reste  = Math.max(0, total - avance);
+  const el = document.getElementById('s-reste');
+  el.textContent = reste.toLocaleString('fr-FR') + ' FCFA';
+  el.className = 'af-value ' + (reste === 0 ? 'zero' : '');
+}
+
+// Étape 1 : mémorise l'ID de l'intervention en cours d'édition (null = création)
+let currentEditId = null;
+
+function saveIntervention() {
+  // BUG 7 CORRIGÉ : désactivation immédiate pour éviter double-clic
+  const btn = document.getElementById('btn-save');
+  btn.disabled = true;
+
+  const nom      = document.getElementById('s-nom').value.trim();
+  const tel      = document.getElementById('s-tel').value.trim();
+  const quartier = document.getElementById('s-quartier').value.trim();
+  const produit    = parseFloat(document.getElementById('s-produit').value)    || 0;
+  const transport  = parseFloat(document.getElementById('s-transport').value)  || 0;
+  const nourriture = parseFloat(document.getElementById('s-nourriture').value) || 0;
+  const divers     = parseFloat(document.getElementById('s-divers').value)     || 0;
+  const boites     = parseInt(document.getElementById('s-boites').value)       || 0;
+  const total  = parseFloat(document.getElementById('s-total').value);
+  const avance = parseFloat(document.getElementById('s-avance').value) || 0;
+
+  const reEnable = () => { btn.disabled = false; };
+
+  // Validations
+  if (!nom)                         { reEnable(); return showToast('⚠️ Le nom est obligatoire', true); }
+  if (!tel)                         { reEnable(); return showToast('⚠️ Le téléphone est obligatoire', true); }
+  if (!quartier)                    { reEnable(); return showToast('⚠️ Le quartier est obligatoire', true); }
+  if (isNaN(total) || total <= 0)   { reEnable(); return showToast('⚠️ Total facturé invalide', true); }
+  if (avance < 0)                   { reEnable(); return showToast('⚠️ L\'avance ne peut pas être négative', true); }
+  if (avance > total)               { reEnable(); return showToast('⚠️ Avance supérieure au total facturé', true); }
+  // BUG 16 CORRIGÉ : blocage des dépenses négatives
+  if (produit < 0 || transport < 0 || nourriture < 0 || divers < 0) {
+    reEnable(); return showToast('⚠️ Les dépenses ne peuvent pas être négatives', true);
+  }
+
+  const type   = document.getElementById('s-type').value;
+  const source = document.getElementById('s-source').value;
+  const reste  = total - avance;
+
+  // BUG 2 CORRIGÉ : date choisie par l'utilisateur
+  const dateVal = document.getElementById('s-date').value;
+  const date = dateVal ? new Date(dateVal + 'T12:00:00').toISOString() : new Date().toISOString();
+
+  const data = getData();
+  let intervention;
+
+  if (currentEditId) {
+    // ── MODE MISE À JOUR : on modifie l'objet existant, paiements intacts ──
+    const idx = data.findIndex(x => x.id === currentEditId);
+    if (idx > -1) {
+      intervention = data[idx];
+      intervention.nom        = nom;        intervention.tel         = tel;
+      intervention.quartier   = quartier;   intervention.date        = date;
+      intervention.type       = type;       intervention.source      = source;
+      intervention.produit    = produit;    intervention.transport   = transport;
+      intervention.nourriture = nourriture; intervention.divers      = divers;
+      intervention.boites     = boites;     intervention.total       = total;
+      intervention.avance     = avance;     intervention.reste       = reste;
+      // On ne touche PAS à intervention.paiements → historique préservé
+      data[idx] = intervention;
+    }
+    currentEditId = null; // Réinitialiser après sauvegarde
+  } else {
+    // ── MODE CRÉATION : nouvel objet avec ID unique ──
+    intervention = {
+      id: generateId(),
+      date, nom, tel, quartier, type, source,
+      produit, transport, nourriture, divers, boites,
+      total, avance, reste,
+      paiements: avance > 0
+        ? [{ date: new Date().toISOString(), montant: avance, note: 'Avance initiale' }]
+        : []
+    };
+    data.unshift(intervention);
+  }
+
+  saveData(data);
+
+  // Tâche 3 : ajout à la file de synchronisation Google Sheets
+  const syncQueue = getSyncQueue();
+  syncQueue.push(intervention);
+  saveSyncQueue(syncQueue);
+  syncWithGoogleSheets();
+
+  // BUG 14 & 15 CORRIGÉS : reset avec '' (vide), jamais '0'
+  ['s-nom','s-tel','s-quartier','s-produit','s-total',
+   's-transport','s-nourriture','s-divers','s-avance','s-boites'].forEach(id => {
+    document.getElementById(id).value = '';
+  });
+  document.getElementById('s-type').value   = 'Dératisation';
+  document.getElementById('s-source').value = 'Bouche à oreille';
+  document.getElementById('s-date').value   = new Date().toISOString().slice(0,10);
+  updateReste();
+  updateBadge();
+
+  showToast('✅ Intervention enregistrée !');
+  // Réactivation après 1.5s (sécurité)
+  setTimeout(reEnable, 1500);
+}
+
+// ═══════════════════════════════════════════════════
+//  DASHBOARD — TÂCHES 1, 3, 4 (filtre période)
+// ═══════════════════════════════════════════════════
+function updateDash() {
+  const now    = new Date();
+  const period = document.getElementById('dash-period').value;
+
+  // Calcul des bornes selon la période choisie
+  let labelStr = '';
+  let dateInPeriod;   // fonction qui teste si une Date est dans la période
+  let pubInPeriod;    // même chose mais pour les pubs (string YYYY-MM-DD)
+
+  if (period === 'day') {
+    const y = now.getFullYear(), m = now.getMonth(), d = now.getDate();
+    labelStr = now.toLocaleDateString('fr-FR', {weekday:'long', day:'2-digit', month:'long', year:'numeric'});
+    dateInPeriod = dt => dt.getFullYear()===y && dt.getMonth()===m && dt.getDate()===d;
+    pubInPeriod  = s => { const pd=new Date(s+'T12:00:00'); return dateInPeriod(pd); };
+
+  } else if (period === 'week') {
+    // Lundi au dimanche de la semaine courante
+    const day  = now.getDay() === 0 ? 6 : now.getDay() - 1; // lundi=0
+    const mon  = new Date(now); mon.setHours(0,0,0,0); mon.setDate(now.getDate() - day);
+    const sun  = new Date(mon); sun.setDate(mon.getDate() + 6); sun.setHours(23,59,59,999);
+    const fmtD = d => d.toLocaleDateString('fr-FR', {day:'2-digit', month:'short'});
+    labelStr = 'Semaine du ' + fmtD(mon) + ' au ' + fmtD(sun);
+    dateInPeriod = dt => dt >= mon && dt <= sun;
+    pubInPeriod  = s => { const pd=new Date(s+'T12:00:00'); return dateInPeriod(pd); };
+
+  } else if (period === 'month') {
+    const y = now.getFullYear(), m = now.getMonth();
+    const monthNames = ['Janvier','Février','Mars','Avril','Mai','Juin',
+      'Juillet','Août','Septembre','Octobre','Novembre','Décembre'];
+    labelStr = monthNames[m] + ' ' + y;
+    dateInPeriod = dt => dt.getMonth()===m && dt.getFullYear()===y;
+    pubInPeriod  = s => { const pd=new Date(s+'T12:00:00'); return dateInPeriod(pd); };
+
+  } else { // year
+    const y = now.getFullYear();
+    labelStr = 'Année ' + y;
+    dateInPeriod = dt => dt.getFullYear()===y;
+    pubInPeriod  = s => { const pd=new Date(s+'T12:00:00'); return dateInPeriod(pd); };
+  }
+
+  document.getElementById('dash-month-label').textContent = labelStr;
+
+  // Charger loyer du mois (toujours basé sur le mois courant réel)
+  loadMonthlyVars(now.getMonth(), now.getFullYear());
+  const loyer = parseFloat(document.getElementById('d-loyer').value) || 0;
+
+  const data     = getData();
+
+  // CA = interventions dont la date est dans la période
+  const moisData = data.filter(i => dateInPeriod(new Date(i.date)));
+  const ca       = moisData.reduce((s,i) => s + i.total, 0);
+
+  // Trésorerie = paiements dont la date est dans la période
+  let tresorerie = 0;
+  data.forEach(i => {
+    if (i.paiements) {
+      i.paiements.forEach(p => {
+        if (dateInPeriod(new Date(p.date))) tresorerie += p.montant;
+      });
+    }
+  });
+
+  const resteTotal = moisData.reduce((s,i) => s + i.reste, 0);
+  const depenses   = moisData.reduce((s,i) => s + i.produit + i.transport + i.nourriture + i.divers, 0);
+
+  // Budget pub = pubs dont la date est dans la période
+  const pubs       = getPubs();
+  const pubsDuMois = pubs.filter(p => pubInPeriod(p.date));
+  const budgetPub  = pubsDuMois.reduce((s,p) => s + p.montant, 0);
+
+  const benefice   = tresorerie - depenses - loyer - budgetPub;
+  const clientsPub = moisData.filter(i => i.source === 'Publicité Facebook').length;
+  const cac        = (clientsPub > 0 && budgetPub > 0) ? budgetPub / clientsPub : null;
+
+  // Mise à jour DOM
+  document.getElementById('d-ca').textContent          = ca.toLocaleString('fr-FR') + ' FCFA';
+  document.getElementById('d-nb-inter').textContent    = moisData.length + ' intervention(s)';
+  document.getElementById('d-tresorerie').textContent  = tresorerie.toLocaleString('fr-FR') + ' FCFA';
+  document.getElementById('d-reste-total').textContent = resteTotal.toLocaleString('fr-FR') + ' FCFA encore à encaisser';
+  document.getElementById('d-depenses').textContent    = depenses.toLocaleString('fr-FR') + ' FCFA';
+  document.getElementById('d-loyer-kpi').textContent   = loyer.toLocaleString('fr-FR') + ' FCFA';
+  document.getElementById('d-pub-total').textContent   = budgetPub.toLocaleString('fr-FR') + ' FCFA';
+  document.getElementById('d-pub-nb').textContent      = pubsDuMois.length + ' campagne(s)';
+
+  const benEl = document.getElementById('d-benefice');
+  benEl.textContent = benefice.toLocaleString('fr-FR') + ' FCFA';
+  benEl.className   = 'kpi-value ' + (benefice >= 0 ? 'accent' : 'red');
+
+  document.getElementById('d-cac').textContent         = cac !== null ? Math.round(cac).toLocaleString('fr-FR') + ' FCFA' : '—';
+  document.getElementById('d-clients-pub').textContent = clientsPub + ' client(s) pub';
+
+  // Init date pub si vide
+  const pubDateEl = document.getElementById('d-pub-date');
+  if (pubDateEl && !pubDateEl.value) pubDateEl.value = now.toISOString().slice(0,10);
+
+  renderListePubs(pubsDuMois);
+}
+
+// ═══════════════════════════════════════════════════
+//  HISTORIQUE — BUG 1 & 12 CORRIGÉS
+// ═══════════════════════════════════════════════════
+function renderHisto() {
+  const data      = getData();
+  const container = document.getElementById('histo-list');
+
+  // TÂCHE 4 : filtre de recherche par nom ou quartier
+  const query = (document.getElementById('search-histo')?.value || '').toLowerCase().trim();
+  const filteredData = query
+    ? data.filter(i =>
+        i.nom.toLowerCase().includes(query) ||
+        i.quartier.toLowerCase().includes(query) ||
+        (i.tel || '').toLowerCase().includes(query)
+      )
+    : data;
+
+  if (data.length === 0) {
+    container.innerHTML = `<div class="empty-state">
+      <div class="empty-icon">📋</div>
+      <div class="empty-text">Aucune intervention enregistrée.<br>Commencez par la page Saisie !</div>
+    </div>`;
+    return;
+  }
+  if (filteredData.length === 0) {
+    container.innerHTML = `<div class="empty-state">
+      <div class="empty-icon">🔍</div>
+      <div class="empty-text">Aucun résultat pour "<strong>${escHtml(query)}</strong>".</div>
+    </div>`;
+    return;
+  }
+
+  container.innerHTML = filteredData.map(i => {
+    const d       = new Date(i.date);
+    const dateStr = d.toLocaleDateString('fr-FR', {day:'2-digit', month:'short', year:'numeric'});
+    const typeClass  = i.type === 'Dératisation' ? 'type-derat' : 'type-desinf';
+    const resteClass = i.reste > 0 ? 'reste-due' : 'reste-ok';
+    const resteText  = i.reste > 0 ? i.reste.toLocaleString('fr-FR') + ' FCFA dû' : '✓ Soldé';
+    // BUG 12 : onclick ouvre le modal de détail
+    return `<div class="inter-card" onclick="openDetailModal('${i.id}')">
+      <div class="inter-top">
+        <div class="inter-name">${escHtml(i.nom)}</div>
+        <span class="inter-type ${typeClass}">${i.type}</span>
+      </div>
+      <div class="inter-bottom">
+        <div class="inter-meta">📍 ${escHtml(i.quartier)} · ${dateStr}</div>
+        <span class="inter-reste ${resteClass}">${resteText}</span>
+      </div>
+      <div style="margin-top:10px;text-align:right;">
+        <button
+          class="btn btn-sm btn-outline"
+          style="font-size:12px;padding:6px 14px;border-color:var(--accent);color:var(--accent);"
+          onclick="event.stopPropagation(); imprimerDepuisHisto('${i.id}')">
+          📄 Facture PDF
+        </button>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+// BUG 12 : modal détail complet
+function openDetailModal(id) {
+  const data = getData();
+  const i    = data.find(x => x.id === id);
+  if (!i) return;
+
+  const d       = new Date(i.date);
+  const dateStr = d.toLocaleDateString('fr-FR', {day:'2-digit', month:'long', year:'numeric'});
+  const depTerrain = i.produit + i.transport + i.nourriture + i.divers;
+  const margeTheo  = i.total - depTerrain;
+  const caParBoite = i.boites > 0 ? Math.round(i.total / i.boites) : 0;
+
+  const paiementsHtml = (i.paiements && i.paiements.length > 0)
+    ? `<div class="modal-section">Historique des paiements</div>` +
+      i.paiements.map(p => {
+        const pd = new Date(p.date).toLocaleDateString('fr-FR', {day:'2-digit', month:'short', year:'numeric'});
+        return `<div class="modal-row">
+          <span class="modal-row-label">✓ ${escHtml(p.note)}<br><small>${pd}</small></span>
+          <span class="modal-row-value" style="color:var(--accent)">${p.montant.toLocaleString('fr-FR')} FCFA</span>
+        </div>`;
+      }).join('')
+    : '';
+
+  document.getElementById('modal-body').innerHTML = `
+    <div class="modal-title">${escHtml(i.nom)}</div>
+    <div class="modal-section">Informations</div>
+    <div class="modal-row"><span class="modal-row-label">📅 Date</span><span class="modal-row-value">${dateStr}</span></div>
+    <div class="modal-row"><span class="modal-row-label">📱 Téléphone</span><span class="modal-row-value">${escHtml(i.tel)}</span></div>
+    <div class="modal-row"><span class="modal-row-label">📍 Quartier</span><span class="modal-row-value">${escHtml(i.quartier)}</span></div>
+    <div class="modal-row"><span class="modal-row-label">🧪 Service</span><span class="modal-row-value">${i.type}</span></div>
+    <div class="modal-row"><span class="modal-row-label">🗣️ Source</span><span class="modal-row-value">${i.source}</span></div>
+    <div class="modal-section">Finances</div>
+    <div class="modal-row"><span class="modal-row-label">💵 Total facturé</span><span class="modal-row-value">${i.total.toLocaleString('fr-FR')} FCFA</span></div>
+    <div class="modal-row"><span class="modal-row-label">📦 Produit</span><span class="modal-row-value">${i.produit.toLocaleString('fr-FR')} FCFA</span></div>
+    <div class="modal-row"><span class="modal-row-label">🚗 Transport</span><span class="modal-row-value">${i.transport.toLocaleString('fr-FR')} FCFA</span></div>
+    <div class="modal-row"><span class="modal-row-label">🍽️ Nourriture</span><span class="modal-row-value">${i.nourriture.toLocaleString('fr-FR')} FCFA</span></div>
+    <div class="modal-row"><span class="modal-row-label">💼 Divers</span><span class="modal-row-value">${i.divers.toLocaleString('fr-FR')} FCFA</span></div>
+    <div class="modal-row"><span class="modal-row-label">📉 Total dépenses</span><span class="modal-row-value" style="color:var(--red)">${depTerrain.toLocaleString('fr-FR')} FCFA</span></div>
+    <div class="modal-row"><span class="modal-row-label">📈 Marge brute</span><span class="modal-row-value" style="color:${margeTheo>=0?'var(--accent)':'var(--red)'}">${margeTheo.toLocaleString('fr-FR')} FCFA</span></div>
+    <div class="modal-row"><span class="modal-row-label">📦 Boîtes installées</span><span class="modal-row-value">${i.boites || 0}</span></div>
+    ${(i.boites > 0) ? `<div class="modal-row"><span class="modal-row-label">📊 CA par Boîte</span><span class="modal-row-value">${caParBoite.toLocaleString('fr-FR')} FCFA</span></div>` : ''}
+    ${paiementsHtml}
+    <div class="modal-row">
+      <span class="modal-row-label" style="color:${i.reste>0?'var(--red)':'var(--accent)'}">⚖️ Reste à payer</span>
+      <span class="modal-row-value" style="color:${i.reste>0?'var(--red)':'var(--accent)'}">
+        ${i.reste > 0 ? i.reste.toLocaleString('fr-FR') + ' FCFA' : '✓ Soldé'}
+      </span>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-danger btn-sm" onclick="deleteIntervention('${i.id}')">🗑️ Supprimer</button>
+      <button class="btn btn-outline btn-sm" onclick="editIntervention('${i.id}')">✏️ Modifier</button>
+      <button class="btn btn-outline btn-sm" onclick="closeModal()">Fermer</button>
+    </div>
+  `;
+  document.getElementById('modal-overlay').classList.add('open');
+}
+
+// Suppression définitive d'une intervention
+function deleteIntervention(id) {
+  if (!confirm('Supprimer cette intervention ? Cette action est irréversible.')) return;
+  let data = getData();
+  data = data.filter(i => i.id !== id);
+  saveData(data);
+  closeModal();
+  renderHisto();
+  updateBadge();
+  showToast('🗑️ Intervention supprimée');
+}
+
+// Étape 1 : édition sans suppression, ID mémorisé dans currentEditId
+function editIntervention(id) {
+  const data = getData();
+  const i    = data.find(x => x.id === id);
+  if (!i) return;
+
+  // 1. Remplir le formulaire avec les données existantes
+  document.getElementById('s-nom').value        = i.nom;
+  document.getElementById('s-tel').value        = i.tel;
+  document.getElementById('s-quartier').value   = i.quartier;
+  document.getElementById('s-date').value       = i.date.split('T')[0];
+  document.getElementById('s-type').value       = i.type;
+  document.getElementById('s-produit').value    = i.produit    || '';
+  document.getElementById('s-transport').value  = i.transport  || '';
+  document.getElementById('s-nourriture').value = i.nourriture || '';
+  document.getElementById('s-divers').value     = i.divers     || '';
+  document.getElementById('s-boites').value     = i.boites     || '';
+  document.getElementById('s-total').value      = i.total;
+  document.getElementById('s-avance').value     = i.avance     || '';
+  document.getElementById('s-source').value     = i.source;
+
+  // 2. Mémoriser l'ID — on NE supprime plus l'ancienne fiche ici
+  currentEditId = id;
+
+  // 3. Fermer le modal et aller sur la page saisie
+  closeModal();
+  showPage('saisie');
+  updateReste();
+  showToast('✏️ Mode édition activé — corrigez puis enregistrez');
+}
+
+function closeModal() {
+  document.getElementById('modal-overlay').classList.remove('open');
+}
+function closeModalOnOverlay(event) {
+  if (event.target === document.getElementById('modal-overlay')) closeModal();
+}
+
+// ═══════════════════════════════════════════════════
+//  DETTES — BUG 7, 8, 13, 18 CORRIGÉS
+// ═══════════════════════════════════════════════════
+function renderDettes() {
+  const data    = getData();
+  const dues    = data.filter(i => i.reste > 0);
+  const totalDu = dues.reduce((s,i) => s + i.reste, 0);
+
+  const wrap = document.getElementById('total-dettes-wrap');
+  const list = document.getElementById('dettes-list');
+
+  if (dues.length === 0) {
+    wrap.innerHTML = '';
+    list.innerHTML = `<div class="empty-state">
+      <div class="empty-icon">🎉</div>
+      <div class="empty-text">Aucun arriéré !<br>Tous les clients sont à jour.</div>
+    </div>`;
+    updateBadge();
+    return;
+  }
+
+  wrap.innerHTML = `<div class="total-dettes">
+    <div class="td-label">⚠️ Total Arriérés</div>
+    <div class="td-value">${totalDu.toLocaleString('fr-FR')} FCFA</div>
+  </div>`;
+
+  list.innerHTML = dues.map(i => {
+    const d       = new Date(i.date);
+    const dateStr = d.toLocaleDateString('fr-FR', {day:'2-digit', month:'short'});
+    // BUG 18 : historique des paiements visibles
+    const paiementsHtml = (i.paiements && i.paiements.length > 0)
+      ? `<div class="dette-payments">${i.paiements.map(p => {
+          const pd = new Date(p.date).toLocaleDateString('fr-FR', {day:'2-digit', month:'short'});
+          return `<div class="dette-payment-item">
+            <span>✓ ${pd} — ${escHtml(p.note)}</span>
+            <span>${p.montant.toLocaleString('fr-FR')} FCFA</span>
+          </div>`;
+        }).join('')}</div>`
+      : '';
+    return `<div class="dette-card" id="dc-${i.id}">
+      <div class="dette-top">
+        <div class="dette-name">${escHtml(i.nom)}</div>
+        <div class="dette-amount">${i.reste.toLocaleString('fr-FR')} FCFA</div>
+      </div>
+      <div class="dette-meta">📱 ${escHtml(i.tel)} · 📍 ${escHtml(i.quartier)} · ${dateStr}</div>
+      ${paiementsHtml}
+      <div class="dette-input-row">
+        <input type="number" id="pay-${i.id}" placeholder="Montant encaissé" min="1" inputmode="numeric">
+        <button class="btn btn-sm btn-outline" id="btn-enc-${i.id}" onclick="encaisser('${i.id}')">Encaisser</button>
+      </div>
+    </div>`;
+  }).join('');
+
+  updateBadge();
+}
+
+function encaisser(id) {
+  // BUG 7 CORRIGÉ : désactivation anti-double-clic
+  const btn = document.getElementById('btn-enc-' + id);
+  if (btn) btn.disabled = true;
+
+  const input    = document.getElementById('pay-' + id);
+  // BUG 8 CORRIGÉ : virgule → point avant parseFloat
+  const rawValue = (input.value || '').replace(',', '.');
+  const montant  = parseFloat(rawValue);
+
+  const data = getData();
+  const idx  = data.findIndex(i => i.id === id);
+  if (idx === -1) { if (btn) btn.disabled = false; return; }
+
+  const item = data[idx];
+  if (isNaN(montant) || montant <= 0) {
+    if (btn) btn.disabled = false;
+    return showToast('⚠️ Montant invalide', true);
+  }
+  if (montant > item.reste) {
+    if (btn) btn.disabled = false;
+    return showToast('⚠️ Montant supérieur à la dette restante', true);
+  }
+
+  data[idx].avance += montant;
+  data[idx].reste   = Math.round((data[idx].reste - montant) * 100) / 100;
+
+  // BUG 18 CORRIGÉ : traçabilité du paiement
+  if (!data[idx].paiements) data[idx].paiements = [];
+  data[idx].paiements.push({
+    date: new Date().toISOString(),
+    montant: montant,
+    note: 'Encaissement terrain'
+  });
+
+  saveData(data);
+
+  // 🚀 Synchroniser l'encaissement avec Google Sheets
+  const syncQueue = getSyncQueue();
+  syncQueue.push(data[idx]); // Envoie l'intervention avec avance et reste mis à jour
+  saveSyncQueue(syncQueue);
+  syncWithGoogleSheets();
+
+  renderDettes();
+  showToast('💰 ' + montant.toLocaleString('fr-FR') + ' FCFA encaissé !');
+}
+
+// ═══════════════════════════════════════════════════
+//  BADGE — BUG 13 CORRIGÉ : montant total abrégé
+// ═══════════════════════════════════════════════════
+function updateBadge() {
+  const data    = getData();
+  const dues    = data.filter(i => i.reste > 0);
+  const totalDu = dues.reduce((s,i) => s + i.reste, 0);
+  const badge   = document.getElementById('badge-dettes');
+  if (dues.length === 0) {
+    badge.style.display = 'none';
+  } else {
+    badge.style.display = 'flex';
+    badge.textContent = totalDu >= 1000000
+      ? Math.round(totalDu/1000000) + 'M'
+      : totalDu >= 1000
+        ? Math.round(totalDu/1000) + 'k'
+        : String(totalDu);
+  }
+}
+
+function escHtml(str) {
+  return String(str)
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;')
+    .replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+let toastTimer;
+function showToast(msg, isError=false) {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.className   = 'show' + (isError ? ' error' : '');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => el.className = '', 2800);
+}
+
+// ═══════════════════════════════════════════════════
+//  SYNCHRONISATION GOOGLE SHEETS — FILE D'ATTENTE
+// ═══════════════════════════════════════════════════
+
+// =========================================================
+// ⚠️  PROPRIÉTAIRE : REMPLACEZ LA VALEUR CI-DESSOUS
+//     PAR L'URL DE VOTRE PROPRE DÉPLOIEMENT APPS SCRIPT
+//     (Menu Apps Script → Déployer → URL de l'appli web)
+// =========================================================
+const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbw68HUx_BwnzGM40jELc1bXNicbZhFv5RMEtsR8XOMJYzcwAAvcIzTHHmts0AbCmL-K5Q/exec';
+
+let isSyncing = false;
+
+function getSyncQueue() {
+  try { return JSON.parse(localStorage.getItem('pcp_sync_queue') || '[]'); } catch { return []; }
+}
+function saveSyncQueue(arr) {
+  try { localStorage.setItem('pcp_sync_queue', JSON.stringify(arr)); } catch {}
+  updateSyncBadge();
+}
+
+async function syncWithGoogleSheets() {
+  if (isSyncing || !navigator.onLine) return updateSyncBadge();
+  const queue = getSyncQueue();
+  if (queue.length === 0) return updateSyncBadge();
+
+  isSyncing = true;
+  updateSyncBadge('syncing');
+  const currentItem = queue[0];
+
+  try {
+    const response = await fetch(SCRIPT_URL, {
+      method: 'POST',
+      body: JSON.stringify(currentItem),
+      headers: { 'Content-Type': 'text/plain;charset=utf-8' }
+    });
+    const result = await response.json();
+
+    if (result.status === 'success') {
+      queue.shift();
+      saveSyncQueue(queue);
+      isSyncing = false;
+      if (queue.length > 0) syncWithGoogleSheets(); // passe au suivant
+    } else throw new Error('Server error');
+  } catch (error) {
+    isSyncing = false;
+    updateSyncBadge(); // reste en attente, réessaiera au prochain "online"
+  }
+}
+
+// Relance automatique dès que le réseau revient
+window.addEventListener('online',  syncWithGoogleSheets);
+window.addEventListener('offline', updateSyncBadge);
+
+// Tâche 3 — badge dynamique
+function updateSyncBadge(status) {
+  const badge = document.getElementById('syncBadge');
+  if (!badge) return;
+  const queue = getSyncQueue();
+  if (status === 'syncing') {
+    badge.innerHTML = '🔄 ENVOI...';      badge.style.color = 'var(--orange)';
+  } else if (!navigator.onLine) {
+    badge.innerHTML = '📶 HORS-LIGNE';    badge.style.color = 'var(--text3)';
+  } else if (queue.length > 0) {
+    badge.innerHTML = `⚠️ ${queue.length} EN ATTENTE`; badge.style.color = 'var(--red)';
+  } else {
+    badge.innerHTML = '✅ SYNCHRONISÉ';   badge.style.color = 'var(--accent)';
+  }
+}
+
+// ═══════════════════════════════════════════════════
+//  INIT
+// ═══════════════════════════════════════════════════
+// Les vars du dash sont maintenant chargées dans updateDash() via loadMonthlyVars()
+updateReste();           // BUG 19 : calcule le reste dès le chargement
+updateBadge();
+updateSyncBadge();       // Affiche l'état de sync au démarrage
+syncWithGoogleSheets();  // Vide la file si des items attendent et qu'on est en ligne
+
+// Service Worker
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('sw.js').catch(() => {});
+}
+
+// ═══════════════════════════════════════════════════
+//  SYSTÈME FACTURE PDF (depuis Historique)
+// ═══════════════════════════════════════════════════
+
+// Compteur auto-incrémenté pour le nom du fichier PDF
+function getNextNumFacture() {
+  const YEAR = new Date().getFullYear();
+  const key  = 'cps_facture_counter_' + YEAR;
+  let count  = parseInt(localStorage.getItem(key) || '0', 10) + 1;
+  localStorage.setItem(key, count);
+  return { num: count, label: YEAR + '-' + String(count).padStart(3, '0') };
+}
+
+// Construit le HTML complet de la facture à partir des données d'une intervention
+function buildFactureHTML(nom, tel, prestation, prix, numLabel, dateStr) {
+  const montantFmt = Number(prix).toLocaleString('fr-FR');
+  const emptyRows  = Array(11).fill(
+    '<tr><td style="border:1px solid #d0d0d0;height:24px;padding:6px 10px;">&nbsp;</td><td style="border:1px solid #d0d0d0;text-align:center;">&nbsp;</td><td style="border:1px solid #d0d0d0;">&nbsp;</td><td style="border:1px solid #d0d0d0;">&nbsp;</td></tr>'
+  ).join('');
+
+  return `<div style="background:#fff;color:#000;font-family:Arial,Helvetica,sans-serif;font-size:12px;border:1px solid #bbb;width:100%;overflow:hidden;">
+    <!-- HEADER -->
+    <div style="display:flex;justify-content:space-between;align-items:flex-start;padding:14px 16px 12px;background:#fff;border-bottom:1px solid #e0e0e0;">
+      <div style="display:flex;align-items:flex-start;gap:12px;">
+        <img src="logo.jpeg" alt="Logo" style="width:80px;height:auto;object-fit:contain;flex-shrink:0;">
+        <div style="display:flex;flex-direction:column;gap:3px;padding-top:2px;font-size:10.5px;color:#333;line-height:1.55;">
+          <span style="font-weight:700;font-size:12px;color:#1a6bb5;text-transform:uppercase;">Clean Professional Services</span>
+          <span>Marcory, Abidjan, Côte d'Ivoire</span>
+          <span>Tél : +2250545558452</span>
+          <span style="color:#1a6bb5;">Email : cleanprofessionelservices@gmail.com</span>
+        </div>
+      </div>
+      <div style="text-align:right;font-size:11px;color:#222;line-height:1.9;white-space:nowrap;">
+        <span style="font-weight:700;color:#1a6bb5;display:block;">Facture N° : ${numLabel}</span>
+        <span>Date : ${dateStr}</span>
+      </div>
+    </div>
+    <!-- BARRE BLEUE -->
+    <div style="height:8px;background:#5d8fd6;width:100%;-webkit-print-color-adjust:exact;print-color-adjust:exact;"></div>
+    <!-- CLIENT -->
+    <div style="background:#5d8fd6;color:#fff;text-align:center;padding:6px 0;font-weight:700;font-size:11px;letter-spacing:1.5px;text-transform:uppercase;-webkit-print-color-adjust:exact;print-color-adjust:exact;">CLIENT</div>
+    <div style="background:#f2f6fc;text-align:center;padding:7px 14px 9px;font-size:11px;color:#333;line-height:1.7;">
+      <div style="font-weight:700;">${nom}</div>
+      <div>${tel}</div>
+    </div>
+    <!-- TABLEAU -->
+    <table style="width:100%;border-collapse:collapse;font-size:11.5px;table-layout:fixed;">
+      <colgroup><col style="width:44%"><col style="width:10%"><col style="width:23%"><col style="width:23%"></colgroup>
+      <thead>
+        <tr style="background:#5d8fd6;color:#fff;-webkit-print-color-adjust:exact;print-color-adjust:exact;">
+          <th style="padding:8px 10px;font-weight:700;text-align:left;text-transform:uppercase;font-size:11px;border:1px solid #4a7abf;">Description</th>
+          <th style="padding:8px 6px;font-weight:700;text-align:center;text-transform:uppercase;font-size:11px;border:1px solid #4a7abf;">QTÉ</th>
+          <th style="padding:8px 6px;font-weight:700;text-align:center;text-transform:uppercase;font-size:11px;border:1px solid #4a7abf;">P.U. (FCFA)</th>
+          <th style="padding:8px 6px;font-weight:700;text-align:center;text-transform:uppercase;font-size:11px;border:1px solid #4a7abf;">Total (FCFA)</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td style="border:1px solid #d0d0d0;padding:6px 10px;font-weight:500;">${prestation}</td>
+          <td style="border:1px solid #d0d0d0;text-align:center;">1</td>
+          <td style="border:1px solid #d0d0d0;text-align:right;padding-right:8px;">${montantFmt}</td>
+          <td style="border:1px solid #d0d0d0;text-align:right;padding-right:8px;">${montantFmt}</td>
+        </tr>
+        ${emptyRows}
+        <tr style="background:#ffff00;-webkit-print-color-adjust:exact;print-color-adjust:exact;">
+          <td colspan="3" style="border:1px solid #c8b800;padding:9px 14px;font-weight:800;text-align:right;text-transform:uppercase;letter-spacing:0.5px;background:#ffff00;">NET À PAYER</td>
+          <td style="border:1px solid #c8b800;padding:9px 8px;font-weight:800;font-size:13px;text-align:right;background:#ffff00;">CFA ${montantFmt}</td>
+        </tr>
+      </tbody>
+    </table>
+    <div style="text-align:center;font-size:10.5px;color:#555;padding:10px;background:#fff;font-style:italic;border-top:1px solid #eee;">Merci pour la confiance</div>
+  </div>`;
+}
+
+// Appelé depuis chaque bouton "📄 Facture PDF" dans l'historique
+function imprimerDepuisHisto(id) {
+  const data = getData();
+  const item = data.find(x => x.id === id);
+  if (!item) return showToast('⚠️ Intervention introuvable', true);
+
+  const { num, label } = getNextNumFacture();
+  const dateStr = new Date().toLocaleDateString('fr-FR', {day:'2-digit', month:'2-digit', year:'numeric'});
+
+  // Construire le HTML en inline styles (résistant au thème sombre)
+  const factureHTML = buildFactureHTML(
+    item.nom, item.tel, item.type, item.total, label, dateStr
+  );
+
+  // Injecter dans le wrapper hors-app
+  const wrapper = document.getElementById('facture-print-wrapper');
+  wrapper.innerHTML = factureHTML;
+
+  // Nommer le fichier PDF automatiquement
+  const prevTitle  = document.title;
+  document.title   = 'facture_' + num;
+
+  window.print();
+
+  // Restaurer après que le dialogue d'impression soit ouvert
+  setTimeout(() => {
+    document.title   = prevTitle;
+    wrapper.innerHTML = '';
+  }, 2000);
+
+  // Sauvegarder dans l'historique des factures
+  try {
+    const hist = JSON.parse(localStorage.getItem('cps_factures') || '[]');
+    hist.unshift({ numFacture: label, date: dateStr, nom: item.nom, tel: item.tel, prestation: item.type, prix: item.total });
+    localStorage.setItem('cps_factures', JSON.stringify(hist));
+  } catch {}
+}
+
+</script>
+
+<!-- Conteneur impression PDF (hors app) -->
+<div id="facture-print-wrapper" style="display:none;"></div>
+
+</body>
+</html>
